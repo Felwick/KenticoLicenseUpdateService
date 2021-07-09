@@ -29,6 +29,7 @@ namespace KenticoLicenseUpdateService
             int numberOfKeys = 0;
             string userName = "";
             string licenseKeySerial = "";
+            bool deleteOldKeys = false;
             //Default run next year because of one year key expiration 
             DateTime nextRunDate = DateTime.Now.AddYears(1);
             List<LicenseKeyInfo> instanceKeys = LicenseKeyInfoProvider.GetLicenseKeys().ToList();
@@ -39,9 +40,13 @@ namespace KenticoLicenseUpdateService
 
                 userName = parameters[0];
                 licenseKeySerial = parameters[1];
-                if (!int.TryParse(parameters[3], out numberOfKeys))
+                if (!int.TryParse(parameters[2], out numberOfKeys))
                 {
                     numberOfKeys = instanceKeys.Count;
+                }
+                if(String.Equals(parameters[3],"true",StringComparison.OrdinalIgnoreCase))
+                {
+                    deleteOldKeys = true;
                 }
             }
             //optional hardcoded fallback values
@@ -63,7 +68,6 @@ namespace KenticoLicenseUpdateService
                 if (errorMessage == null && retries != 0)
                 {
                     var licenseKey = GetLicenseKey(licenseKeySerial, key.Domain, userName, out errorMessage);
-
                     //Force sleep to avoid hitting request rate limit on service side
                     Thread.Sleep(800);
 
@@ -72,14 +76,14 @@ namespace KenticoLicenseUpdateService
                     {
                         eventLog.LogInformation(nameof(LicenseUpdater), "I", $"Licence service error: {errorMessage}. Retry attempts left: {retries}");
                         errorMessage = null;
-
-                        //iterator reset
+                        //iterator reset for retry
                         i--;
                         retries--;
                         continue;
                     }
 
                     generatedKeys.Add(licenseKey);
+                    LicenseKeyInfoProvider.DeleteLicenseKeyInfo(key);
                 }
 
                 if (retries == 0)
