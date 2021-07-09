@@ -30,16 +30,11 @@ https://service.kentico.com/CMSLicenseService.asmx
 
 Standalone library set up with scheduled tasks. To configure task within the admin instance please follow documentation https://docs.xperience.io/configuring-xperience/scheduling-tasks/scheduling-custom-tasks
 
-### Executing program
-
-## Help
-
-
 ## Authors
 
 Contributors names and contact info
 
-ex. Michal Samuhel 
+Michal Samuhel 
 
 ## Version History
 
@@ -48,7 +43,8 @@ ex. Michal Samuhel
 
 ## License
 
-This project is free to use
+This project is licensed under the MIT License
+
 
 ## Acknowledgments
 
