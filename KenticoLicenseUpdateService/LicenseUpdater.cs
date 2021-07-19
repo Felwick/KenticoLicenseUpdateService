@@ -56,8 +56,8 @@ namespace KenticoLicenseUpdateService
             }
             else
             {
-                userName = "michals@kentico.com";
-                licenseKeySerial = "CV13-000-000-000-9500-20220131-6C2461BD19";
+                userName = "";
+                licenseKeySerial = "";
                 numberOfKeys = instanceKeys.Count;
 
             }     
