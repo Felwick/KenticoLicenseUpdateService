@@ -17,7 +17,8 @@ If it is not prepared and hardcode takes in 3 parameters in Task data property o
 1. User name used as a credential to access license service
 2. License key serial used to verify and generate license keys agains Xperience license 
 3. Number of license keys which should be generated in case you want only a certain number of keys generated 
-4. true/false boolean check as to whether old license keys should be deleted
+4. Version number for which license key should be generated. If version is not set directly, key will be the same version as the serial number
+5. true/false boolean check as to whether old license keys should be deleted
 
 ## Getting Started
 
