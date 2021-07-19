@@ -1,7 +1,8 @@
+using CMS.Core;
 using CMS.EventLog;
 using CMS.LicenseProvider;
 using CMS.Scheduler;
-using LicenseUpdater.com.kentico.service;
+using KenticoLicenseUpdateService.com.kentico.service;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -10,7 +11,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 
-namespace LicenseUpdater
+namespace KenticoLicenseUpdateService
 {
     public class LicenseUpdater : ITask
     {
@@ -19,11 +20,14 @@ namespace LicenseUpdater
 
         public string Execute(TaskInfo task)
         {
-            EventLogProvider.LogInformation(nameof(LicenseUpdater),"I", $"{nameof(LicenseUpdater)} has started running" );
+            IEventLogService eventLog = Service.Resolve<IEventLogService>();
+            
+            eventLog.LogEvent(nameof(LicenseUpdater), "I", $"{nameof(LicenseUpdater)} has started running");
             stopWatch.Start();
             int retries = 3;
             int numberOfKeys = 0;
-            int desiredVersion = 0; 
+            int desiredVersion = 0;
+            bool deleteOldKeys = false;
             string userName = "";
             string licenseKeySerial = "";
             //Default run next year because of one year key expiration 
@@ -44,6 +48,11 @@ namespace LicenseUpdater
                 {
                     numberOfKeys = instanceKeys.Count;
                 }
+                if (String.Equals(parameters[4], "true", StringComparison.OrdinalIgnoreCase))
+                {
+                    deleteOldKeys = true;
+                }
+
             }
             else
             {
@@ -70,7 +79,7 @@ namespace LicenseUpdater
                     //error check, reset and retry
                     if (errorMessage != null)
                     {
-                        EventLogProvider.LogInformation(nameof(LicenseUpdater), "I", $"Licence service error: {errorMessage}. Retry attempts left: {retries}");
+                        eventLog.LogInformation(nameof(LicenseUpdater), "I", $"Licence service error: {errorMessage}. Retry attempts left: {retries}");
                         errorMessage = null;
                         
                         //iterator reset
@@ -80,11 +89,12 @@ namespace LicenseUpdater
                     }
 
                     generatedKeys.Add(licenseKey);
+                    LicenseKeyInfoProvider.DeleteLicenseKeyInfo(key);
                 }    
 
                 if(retries == 0)
                 {
-                    EventLogProvider.LogEvent(nameof(LicenseUpdater), "E", $"Licence service error: {errorMessage}. Retries exhausted, attempts left: {retries}. Event time: {DateTime.Now}");
+                    eventLog.LogEvent(nameof(LicenseUpdater), "E", $"Licence service error: {errorMessage}. Retries exhausted, attempts left: {retries}. Event time: {DateTime.Now}");
                     return $"Licence service error: {errorMessage}. Retries exhausted, attempts left: {retries}. Event time: {DateTime.Now}";
                 }
                 
@@ -112,7 +122,7 @@ namespace LicenseUpdater
 
             task.TaskNextRunTime = nextRunDate;
             stopWatch.Stop();
-            EventLogProvider.LogInformation(nameof(LicenseUpdater), "I", $"Licence key service run finished. Runtime: {stopWatch.Elapsed}, generated keys: {generatedKeys.Count}");
+            eventLog.LogInformation(nameof(LicenseUpdater), "I", $"Licence key service run finished. Runtime: {stopWatch.Elapsed}, generated keys: {generatedKeys.Count}");
 
             return $"Licence key service run finished. Runtime: {stopWatch.Elapsed}, generated keys: {generatedKeys.Count}";
         }
