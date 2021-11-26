@@ -20,9 +20,7 @@ namespace KenticoLicenseUpdateService
 
         public string Execute(TaskInfo task)
         {
-            IEventLogService eventLog = Service.Resolve<IEventLogService>();
-            
-            eventLog.LogEvent(nameof(LicenseUpdater), "I", $"{nameof(LicenseUpdater)} has started running");
+            EventLogProvider.LogEvent(nameof(LicenseUpdater), "I", $"{nameof(LicenseUpdater)} has started running");
             stopWatch.Start();
             int retries = 3;
             int numberOfKeys = 0;
@@ -79,7 +77,7 @@ namespace KenticoLicenseUpdateService
                     //error check, reset and retry
                     if (errorMessage != null)
                     {
-                        eventLog.LogInformation(nameof(LicenseUpdater), "I", $"Licence service error: {errorMessage}. Retry attempts left: {retries}");
+                        EventLogProvider.LogInformation(nameof(LicenseUpdater), "I", $"Licence service error: {errorMessage}. Retry attempts left: {retries}");
                         errorMessage = null;
                         
                         //iterator reset
@@ -94,7 +92,7 @@ namespace KenticoLicenseUpdateService
 
                 if(retries == 0)
                 {
-                    eventLog.LogEvent(nameof(LicenseUpdater), "E", $"Licence service error: {errorMessage}. Retries exhausted, attempts left: {retries}. Event time: {DateTime.Now}");
+                    EventLogProvider.LogEvent(nameof(LicenseUpdater), "E", $"Licence service error: {errorMessage}. Retries exhausted, attempts left: {retries}. Event time: {DateTime.Now}");
                     return $"Licence service error: {errorMessage}. Retries exhausted, attempts left: {retries}. Event time: {DateTime.Now}";
                 }
                 
@@ -122,7 +120,7 @@ namespace KenticoLicenseUpdateService
 
             task.TaskNextRunTime = nextRunDate;
             stopWatch.Stop();
-            eventLog.LogInformation(nameof(LicenseUpdater), "I", $"Licence key service run finished. Runtime: {stopWatch.Elapsed}, generated keys: {generatedKeys.Count}");
+            EventLogProvider.LogInformation(nameof(LicenseUpdater), "I", $"Licence key service run finished. Runtime: {stopWatch.Elapsed}, generated keys: {generatedKeys.Count}");
 
             return $"Licence key service run finished. Runtime: {stopWatch.Elapsed}, generated keys: {generatedKeys.Count}";
         }
