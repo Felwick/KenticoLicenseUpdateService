@@ -24,8 +24,15 @@ If it is not prepared and hardcode takes in 3 parameters in Task data property o
 
 ### Dependencies
 
+master branch: 
+
 xperience.libraries 13.0.33
 https://service.kentico.com/CMSLicenseService.asmx
+
+v12branch: 
+Kentico.Libraries 12.0.97  
+https://service.kentico.com/CMSLicenseService.asmx
+
 
 ### Installing
 
@@ -41,6 +48,8 @@ Michal Samuhel
 
 * 0.1
     * Initial Release
+* 0.2
+    * New branch for k12  
 
 ## License
 
