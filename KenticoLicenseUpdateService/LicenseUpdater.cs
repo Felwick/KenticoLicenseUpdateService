@@ -2,6 +2,7 @@ using CMS.Core;
 using CMS.EventLog;
 using CMS.LicenseProvider;
 using CMS.Scheduler;
+using CMS.SiteProvider;
 using KenticoLicenseUpdateService.com.kentico.service;
 using System;
 using System.Collections.Generic;
@@ -17,99 +18,65 @@ namespace KenticoLicenseUpdateService
     {
         Stopwatch stopWatch = new Stopwatch();
         int count = 0;
+        int retries = 3;
+        int numberOfKeys = 0;
+        int desiredVersion = 0;
+        bool deleteOldKeys = false;
+        string userName = "";
+        string licenseKeySerial = "";
+
+        public int Retries { get => retries; set => retries = value; }
+        public int NumberOfKeys { get => numberOfKeys; set => numberOfKeys = value; }
+        public int DesiredVersion { get => desiredVersion; set => desiredVersion = value; }
+        public bool DeleteOldKeys { get => deleteOldKeys; set => deleteOldKeys = value; }
+        public string UserName { get => userName; set => userName = value; }
+        public string LicenseKeySerial { get => licenseKeySerial; set => licenseKeySerial = value; }
 
         public string Execute(TaskInfo task)
         {
             IEventLogService eventLog = Service.Resolve<IEventLogService>();
             
-            eventLog.LogEvent(nameof(LicenseUpdater), "I", $"{nameof(LicenseUpdater)} has started running");
+            eventLog.LogEvent( EventTypeEnum.Information,nameof(LicenseUpdater), "I", $"{nameof(LicenseUpdater)} has started running");
             stopWatch.Start();
-            int retries = 3;
-            int numberOfKeys = 0;
-            int desiredVersion = 0;
-            bool deleteOldKeys = false;
-            string userName = "";
-            string licenseKeySerial = "";
+            stopWatch.Start();
+            string resultMessage;
+
             //Default run next year because of one year key expiration 
             DateTime nextRunDate = DateTime.Now.AddYears(1);
             List<LicenseKeyInfo> instanceKeys = LicenseKeyInfoProvider.GetLicenseKeys().ToList();
 
-            if (task.TaskData != "")
-            {
-                string[] parameters = task.TaskData.Split('\n');
+            ParseParametersInput(task, instanceKeys);
 
-                userName = parameters[0];
-                licenseKeySerial = parameters[1];
-                if(!int.TryParse(parameters[2], out desiredVersion))
-                {
-                    desiredVersion = 0;
-                }
-                if (!int.TryParse(parameters[3], out numberOfKeys))
-                {
-                    numberOfKeys = instanceKeys.Count;
-                }
-                if (String.Equals(parameters[4], "true", StringComparison.OrdinalIgnoreCase))
-                {
-                    deleteOldKeys = true;
-                }
-
-            }
-            else
-            {
-                userName = "";
-                licenseKeySerial = "";
-                numberOfKeys = instanceKeys.Count;
-
-            }     
-           
             List<string> generatedKeys = new List<string>();
 
-            string errorMessage = null;
+            resultMessage = GenerateNewKeys(generatedKeys, instanceKeys, eventLog);
 
-            for (int i = 0; i < numberOfKeys; i++)
+            if (generatedKeys.Any())
             {
-                LicenseKeyInfo key = instanceKeys[i];
-                if(errorMessage == null && retries != 0)
-                {
-                    var licenseKey = GetLicenseKey(licenseKeySerial, key.Domain, desiredVersion, userName, out errorMessage);
-
-                    //Force sleep to avoid hitting request rate limit on service side
-                    Thread.Sleep(800);
-
-                    //error check, reset and retry
-                    if (errorMessage != null)
-                    {
-                        eventLog.LogInformation(nameof(LicenseUpdater), "I", $"Licence service error: {errorMessage}. Retry attempts left: {retries}");
-                        errorMessage = null;
-                        
-                        //iterator reset
-                        i--;
-                        retries--;
-                        continue;                      
-                    }
-
-                    generatedKeys.Add(licenseKey);
-                    LicenseKeyInfoProvider.DeleteLicenseKeyInfo(key);
-                }    
-
-                if(retries == 0)
-                {
-                    eventLog.LogEvent(nameof(LicenseUpdater), "E", $"Licence service error: {errorMessage}. Retries exhausted, attempts left: {retries}. Event time: {DateTime.Now}");
-                    return $"Licence service error: {errorMessage}. Retries exhausted, attempts left: {retries}. Event time: {DateTime.Now}";
-                }
-                
+                eventLog.LogEvent(EventTypeEnum.Information,nameof(LicenseUpdater), "I", $"Licence key service run finished. Runtime: {stopWatch.Elapsed}, no generated keys");
+                return $"Task finished running with no generated keys";
             }
-            foreach(var key in generatedKeys)
+            ProcessAndInserNewKeys(generatedKeys, nextRunDate);
+
+            task.TaskNextRunTime = nextRunDate;
+            stopWatch.Stop();
+            eventLog.LogEvent(EventTypeEnum.Information,nameof(LicenseUpdater), "I", $"Licence key service run finished. Runtime: {stopWatch.Elapsed}, generated keys: {generatedKeys.Count}");
+
+            return $"Licence key service run finished. Runtime: {stopWatch.Elapsed} {resultMessage}";
+        }
+
+        private void ProcessAndInserNewKeys(List<string> generatedKeys, DateTime nextRunDate)
+        {
+            foreach (var key in generatedKeys)
             {
-                
 
                 string[] splitString = key.Split(Environment.NewLine.ToCharArray());
-                if(splitString.Any())
+                if (splitString.Any())
                 {
-                    int index =  splitString[3].IndexOf("EXPIRATION:", StringComparison.Ordinal) + 11;
+                    int index = splitString[3].IndexOf("EXPIRATION:", StringComparison.Ordinal) + 11;
                     string timeString = splitString[3].Substring(index, 8).Trim();
                     DateTime expiryDateTime = new DateTime(Convert.ToInt32(timeString.Substring(0, 4)), Convert.ToInt32(timeString.Substring(4, 2)), Convert.ToInt32(timeString.Substring(6, 2)), 0, 0, 0);
-                    if(DateTime.Compare(expiryDateTime,nextRunDate)<0)
+                    if (DateTime.Compare(expiryDateTime, nextRunDate) < 0)
                     {
                         nextRunDate = expiryDateTime;
                     }
@@ -117,14 +84,53 @@ namespace KenticoLicenseUpdateService
                     licenseKeyInfo.LoadLicense(key, splitString[0]);
                     licenseKeyInfo.Insert();
                 }
-                
+
             }
+        }
 
-            task.TaskNextRunTime = nextRunDate;
-            stopWatch.Stop();
-            eventLog.LogInformation(nameof(LicenseUpdater), "I", $"Licence key service run finished. Runtime: {stopWatch.Elapsed}, generated keys: {generatedKeys.Count}");
+        private string GenerateNewKeys(List<string> generatedKeys, List<LicenseKeyInfo> instanceKeys, IEventLogService eventLog)
+        {
+            string errorMessage = null;
 
-            return $"Licence key service run finished. Runtime: {stopWatch.Elapsed}, generated keys: {generatedKeys.Count}";
+            for (int i = 0; i < NumberOfKeys; i++)
+            {
+                LicenseKeyInfo key = instanceKeys[i];
+                if (errorMessage == null && Retries != 0)
+                {
+                    var licenseKey = GetLicenseKey(LicenseKeySerial, key.Domain, DesiredVersion, UserName, out errorMessage);
+
+                    //Force sleep to avoid hitting request rate limit on service side
+                    Thread.Sleep(800);
+
+                    //error check, reset and retry
+                    if (errorMessage != null)
+                    {
+                        eventLog.LogError(nameof(LicenseUpdater), "I", $"Licence service error: {errorMessage}. Retry attempts left: {Retries}");
+                        errorMessage = null;
+
+                        //iterator reset
+                        i--;
+                        Retries--;
+                        continue;
+                    }
+
+                    generatedKeys.Add(licenseKey);
+
+                    if (DeleteOldKeys == true)
+                    {
+                        LicenseKeyInfoProvider.DeleteLicenseKeyInfo(key);
+                    }
+
+                }
+
+                if (Retries == 0)
+                {
+                    eventLog.LogError(nameof(LicenseUpdater), "E", $"Licence service error: {errorMessage}. Retries exhausted, attempts left: {Retries}. Event time: {DateTime.Now}");
+                    return $"Licence service error: {errorMessage}. Retries exhausted, attempts left: {Retries}. Event time: {DateTime.Now}";
+                }
+
+            }
+            return $"{generatedKeys.Count} license keys were generated with setting DeleteOldKeys set to {DeleteOldKeys.ToString()}";
         }
 
         private static string GetLicenseKey(string sn, string domain, int desiredVersion, string userName, out string errorMessage)
@@ -139,15 +145,55 @@ namespace KenticoLicenseUpdateService
 
             // If version is not set directly, key will be the same version as the serial number using this as a default fallback if version is not supplied specifically
             int? version = null;
-            if ( desiredVersion != 0)
+            if (desiredVersion != 0)
             {
                 version = desiredVersion;
             }
-                
+
             // Different types of keys - Main will use up a slot of the license, other types can be used only for unlimited licenses
             LicenseKeyTypeEnum keyType = LicenseKeyTypeEnum.Main;
 
             return service.GetKeyGeneral(data, version, keyType, out errorMessage);
+        }
+
+        private void ParseParametersInput(TaskInfo task, List<LicenseKeyInfo> instanceKeys)
+        {
+            if (task.TaskData != "")
+            {
+                string[] parameters = task.TaskData.Split('\n');
+
+                this.UserName = parameters[0];
+                LicenseKeySerial = parameters[1];
+                int desiredVersion;
+
+                if (!int.TryParse(parameters[2], out desiredVersion))
+                {
+                    DesiredVersion = 0;
+                }
+
+                DesiredVersion = desiredVersion;
+
+                int numberOfKeys;
+
+                if (!int.TryParse(parameters[3], out numberOfKeys))
+                {
+                    NumberOfKeys = instanceKeys.Count;
+                }
+                NumberOfKeys = numberOfKeys;
+
+                if (String.Equals(parameters[4], "true", StringComparison.OrdinalIgnoreCase))
+                {
+                    DeleteOldKeys = true;
+                }
+
+            }
+            else
+            {
+                UserName = "";
+                LicenseKeySerial = "";
+                NumberOfKeys = instanceKeys.Count;
+
+            }
         }
     }
 }
