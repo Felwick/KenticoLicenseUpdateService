@@ -13,7 +13,9 @@ It sets its next run time automatically based on earliest expiry date detected i
 
 It can be hardcoded with desired credentials and it can also clean up old keys from an instance. 
 
-If it is not prepared and hardcode takes in 3 parameters in Task data property of scheduled task (https://docs.xperience.io/configuring-xperience/scheduling-tasks/reference-scheduled-task-properties). Each should be on new line. 
+Deletion of old keys setting is bypassed because it would cause an exception when trying to insert key for same domain even for different versions. Now old keys are deleted automatically
+
+If it is not prepared and hardcode takes in 3 parameters in Task data property of scheduled task (https://docs.xperience.io/configuring-xperience/scheduling-tasks/reference-scheduled-task-properties). Each entry is seperated by ';' semicolumn as a delimiter. 
 1. User name used as a credential to access license service
 2. License key serial used to verify and generate license keys agains Xperience license 
 3. Number of license keys which should be generated in case you want only a certain number of keys generated 
@@ -24,8 +26,15 @@ If it is not prepared and hardcode takes in 3 parameters in Task data property o
 
 ### Dependencies
 
-xperience.libraries 13.0.33
+master branch: 
+
+xperience.libraries 13.0.117
 https://service.kentico.com/CMSLicenseService.asmx
+
+v12branch: 
+Kentico.Libraries 12.0.99
+https://service.kentico.com/CMSLicenseService.asmx
+
 
 ### Installing
 
@@ -41,6 +50,10 @@ Michal Samuhel
 
 * 0.1
     * Initial Release
+* 0.2
+    * New branch for k12  
+* 0.3
+    * Major method refactoring, splitting code into multiple methods and utilities, improved array and list handling  
 
 ## License
 
