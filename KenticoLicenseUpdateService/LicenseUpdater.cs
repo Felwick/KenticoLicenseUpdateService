@@ -1,3 +1,4 @@
+using CMS.Base;
 using CMS.Core;
 using CMS.EventLog;
 using CMS.LicenseProvider;
@@ -51,7 +52,7 @@ namespace KenticoLicenseUpdateService
 
             resultMessage = GenerateNewKeys(generatedKeys, instanceKeys, eventLog);
 
-            if (generatedKeys.Any())
+            if (!generatedKeys.Any())
             {
                 eventLog.LogEvent(EventTypeEnum.Information,nameof(LicenseUpdater), "I", $"Licence key service run finished. Runtime: {stopWatch.Elapsed}, no generated keys");
                 return $"Task finished running with no generated keys";
@@ -62,7 +63,7 @@ namespace KenticoLicenseUpdateService
             stopWatch.Stop();
             eventLog.LogEvent(EventTypeEnum.Information,nameof(LicenseUpdater), "I", $"Licence key service run finished. Runtime: {stopWatch.Elapsed}, generated keys: {generatedKeys.Count}");
 
-            return $"Licence key service run finished. Runtime: {stopWatch.Elapsed} {resultMessage}";
+            return $"Licence key service run finished. Runtime: {stopWatch.Elapsed}. {generatedKeys.Count} license keys were generated with setting DeleteOldKeys set to {DeleteOldKeys.ToString()}";
         }
 
         private void ProcessAndInserNewKeys(List<string> generatedKeys, DateTime nextRunDate)
@@ -74,7 +75,7 @@ namespace KenticoLicenseUpdateService
                 if (splitString.Any())
                 {
                     int index = splitString[3].IndexOf("EXPIRATION:", StringComparison.Ordinal) + 11;
-                    string timeString = splitString[3].Substring(index, 8).Trim();
+                    string timeString = splitString[2].Substring(index+1, 8).Trim();
                     DateTime expiryDateTime = new DateTime(Convert.ToInt32(timeString.Substring(0, 4)), Convert.ToInt32(timeString.Substring(4, 2)), Convert.ToInt32(timeString.Substring(6, 2)), 0, 0, 0);
                     if (DateTime.Compare(expiryDateTime, nextRunDate) < 0)
                     {
@@ -91,9 +92,16 @@ namespace KenticoLicenseUpdateService
         private string GenerateNewKeys(List<string> generatedKeys, List<LicenseKeyInfo> instanceKeys, IEventLogService eventLog)
         {
             string errorMessage = null;
+            string resultMessage = $"{generatedKeys.Count} license keys were generated with setting DeleteOldKeys set to {DeleteOldKeys.ToString()}";
 
             for (int i = 0; i < NumberOfKeys; i++)
             {
+                
+                int accesControl = i + 1;
+                if (accesControl > instanceKeys.Count)
+                {
+                    return resultMessage;
+                }
                 LicenseKeyInfo key = instanceKeys[i];
                 if (errorMessage == null && Retries != 0)
                 {
@@ -130,7 +138,7 @@ namespace KenticoLicenseUpdateService
                 }
 
             }
-            return $"{generatedKeys.Count} license keys were generated with setting DeleteOldKeys set to {DeleteOldKeys.ToString()}";
+            return resultMessage;
         }
 
         private static string GetLicenseKey(string sn, string domain, int desiredVersion, string userName, out string errorMessage)
@@ -160,28 +168,31 @@ namespace KenticoLicenseUpdateService
         {
             if (task.TaskData != "")
             {
-                string[] parameters = task.TaskData.Split('\n');
+                string[] parameters = task.TaskData.Split(';');
 
                 this.UserName = parameters[0];
                 LicenseKeySerial = parameters[1];
-                int desiredVersion;
-
-                if (!int.TryParse(parameters[2], out desiredVersion))
-                {
-                    DesiredVersion = 0;
-                }
-
-                DesiredVersion = desiredVersion;
-
                 int numberOfKeys;
 
-                if (!int.TryParse(parameters[3], out numberOfKeys))
+                if (!int.TryParse(parameters[2], out numberOfKeys))
                 {
                     NumberOfKeys = instanceKeys.Count;
                 }
+
                 NumberOfKeys = numberOfKeys;
 
-                if (String.Equals(parameters[4], "true", StringComparison.OrdinalIgnoreCase))
+                int  desiredVersion;
+
+                if (!int.TryParse(parameters[3], out desiredVersion))
+                {
+                    desiredVersion = int.Parse(CMSVersion.MainVersion);
+                }
+                else 
+                {
+                    DesiredVersion = desiredVersion;
+                }
+
+                if (bool.Parse(parameters[4]))
                 {
                     DeleteOldKeys = true;
                 }
