@@ -153,10 +153,11 @@ namespace KenticoLicenseUpdateService
             {
                 version = desiredVersion;
             }
-                
+
             // Different types of keys - Main will use up a slot of the license, other types can be used only for unlimited licenses
             LicenseKeyTypeEnum keyType = LicenseKeyTypeEnum.Main;
             EventLogProvider.LogInformation("GetLicenseKey", "I", $"Encrypted data:{data}, version {version}, key type: {keyType}. Unencrypted data - Serial {sn}, domain:{domain}, versions{desiredVersion.ToString()}, user name:{userName}");
+            EventLogProvider.LogInformation("GetLicenseKey service details", "I",$"Service URL: {service.Url}, user agent: {service.UserAgent}, certificates: {service.ClientCertificates},credentials: {service.Credentials},site: {service.Site},Soap version: {service.SoapVersion}");
             return service.GetKeyGeneral(data, version, keyType, out errorMessage);
         }
 
