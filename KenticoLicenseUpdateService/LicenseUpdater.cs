@@ -89,7 +89,6 @@ namespace KenticoLicenseUpdateService
         private string GenerateNewKeys(List<string> generatedKeys, List<LicenseKeyInfo> instanceKeys)
         {
             string errorMessage = null;
-            string resultMessage = $"{generatedKeys.Count} license keys were generated with setting DeleteOldKeys set to {DeleteOldKeys.ToString()}";
 
             for (int i = 0; i < NumberOfKeys; i++)
             {
@@ -97,7 +96,7 @@ namespace KenticoLicenseUpdateService
                 int accesControl = i + 1;
                 if (accesControl > instanceKeys.Count)
                 {
-                    return resultMessage;
+                    return $"{generatedKeys.Count} license keys were generated with setting DeleteOldKeys set to {DeleteOldKeys.ToString()}";
                 }
                 LicenseKeyInfo key = instanceKeys[i];
                 if (errorMessage == null && Retries != 0)
@@ -135,7 +134,7 @@ namespace KenticoLicenseUpdateService
                 }
 
             }
-            return resultMessage;
+            return $"{generatedKeys.Count} license keys were generated with setting DeleteOldKeys set to {DeleteOldKeys.ToString()}";
         }
 
         private static string GetLicenseKey(string sn, string domain, int desiredVersion, string userName, out string errorMessage)
