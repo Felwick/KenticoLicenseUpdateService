@@ -107,7 +107,7 @@ namespace KenticoLicenseUpdateService
                     Thread.Sleep(800);
 
                     //error check, reset and retry
-                    if (errorMessage != null)
+                    if (errorMessage != null && Retries!=0)
                     {
                         EventLogProvider.LogInformation(nameof(LicenseUpdater), "I", $"Licence service error: {errorMessage}. Retry attempts left: {Retries}");
                         errorMessage = null;
@@ -156,7 +156,7 @@ namespace KenticoLicenseUpdateService
                 
             // Different types of keys - Main will use up a slot of the license, other types can be used only for unlimited licenses
             LicenseKeyTypeEnum keyType = LicenseKeyTypeEnum.Main;
-
+            EventLogProvider.LogInformation("GetLicenseKey", "I", $"Encrypted data:{data}, version {version}, key type: {keyType}. Unencrypted data - Serial {sn}, domain:{domain}, versions{desiredVersion.ToString()}, user name:{userName}");
             return service.GetKeyGeneral(data, version, keyType, out errorMessage);
         }
 
@@ -201,6 +201,7 @@ namespace KenticoLicenseUpdateService
                 NumberOfKeys = instanceKeys.Count;
 
             }
+            EventLogProvider.LogInformation("Parse Source Data", "I",$"Task data: {task.TaskData}. Parsed properties:{this.UserName},{this.NumberOfKeys},{this.DesiredVersion},{this.LicenseKeySerial}");
         }
     }
 }
